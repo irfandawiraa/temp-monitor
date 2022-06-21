@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>Monitoring suhu IoT</title>
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.0-beta1/dist/css/bootstrap.min.css" rel="stylesheet"
+    integrity="sha384-0evHe/X+R7YkIZDRvuzKMRqM+OrBnVFBL6DOitfPri4tjfHxaWutUpFmBp4vmVor" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css"
+    integrity="sha512-1ycn6IcaQQ40/MKBW2W4Rhis/DbILU74C1vSrLJxCq57o941Ym01SwNsOMqvEBFlcgUa6xLiPY/NS5R+E6ztJQ=="
+    crossorigin="anonymous" referrerpolicy="no-referrer" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@200;300;400;500;600&display=swap" rel="stylesheet">
+
+  <style>
+    .rounded {
+      border-radius: 10px !important;
+    }
+
+    h1,
+    h5 {
+      color: #f5f5f5 !important;
+    }
+  </style>
+</head>
+
+<body style="background: #2e405e; font-family: 'Poppins', sans-serif;">
+  <nav class="navbar shadow" style="background: #15253f; height: 66px;">
+    <div class="container">
+      <span class="navbar-brand mb-0 h1" style="color: #f5f5f5"><i class="fas fa-temperature-high me-2"></i>
+        TempMonitor</span>
+    </div>
+  </nav>
+
+  <div class="container mt-4">
+    <div class="row">
+      <div class="col-lg-4">
+        <div style="display: flex; flex-direction: column; gap: 1.5rem">
+          <div class="shadow rounded p-3" style="background-color: #ff9b97; height: 200px;">
+            <h5><i class="fas fa-temperature-high me-2"></i>Suhu tertinggi hari ini</h5>
+            <h1 id="hcmax" style="text-align: center; font-size: 72px; margin-top: 2rem">0°C</h1>
+          </div>
+          <div class="shadow rounded p-3" style="background-color: #75ceff; height: 200px;">
+            <h5><i class="fas fa-temperature-low me-2"></i>Suhu terendah hari ini</h5>
+            <h1 id="hcmin" style="text-align: center; font-size: 72px; margin-top: 2rem">0°C</h1>
+          </div>
+        </div>
+      </div>
+      <div class="col-lg-8">
+        <div class="rounded shadow p-4" style="background-color: #15253f; height: calc(400px + 1.5rem);">
+          <div class="chart-container" style="position: relative; height: 100%; width:100%">
+            <canvas id="chartsuhu"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.0-beta1/dist/js/bootstrap.bundle.min.js"
+    integrity="sha384-pprn3073KE6tl6bjs2QrFaJGz5/SUsLqktiwsUTF55Jfv3qYSDhgCecCxMW52nD2" crossorigin="anonymous"></script>
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.8.0/chart.min.js"
+    integrity="sha512-sW/w8s4RWTdFFSduOTGtk4isV1+190E/GghVffMA9XczdJ2MDzSzLEubKAs5h0wzgSJOQTRYyaz73L3d6RtJSg=="
+    crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.14.1/moment.min.js"></script>
+
+  <script>
+    const date = moment().format("YYYY-MM-DD");
+
+    console.log(date);
+    var reg = 0;
+    var cmax = 0;
+    var cmin = 500;
+
+    var ctx = document.getElementById('chartsuhu').getContext('2d');
+    var chartsuhu = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: [],
+        datasets: [{
+          label: 'suhu_sensor1',
+          data: [],
+          backgroundColor: 'rgba(54, 162, 235, 0.2)',
+          borderColor: 'rgba(54, 162, 235, 1)',
+          borderWidth: 1
+        }]
+      },
+      options: {
+        maintainAspectRatio: false,
+        scales: {
+          y: {
+            beginAtZero: true,
+          },
+          x: {
+            ticks: {
+              display: false,
+            }
+          }
+        },
+      },
+    });
+
+    $(document).ready(function() {
+      getsuhu();
+    });
+
+    function getsuhu() {
+      $.ajax({
+        type: "GET",
+        url: "https://api.thingspeak.com/channels/1774021/fields/1.json?api_key=AEFLOGK0L7N40P6V",
+        success: function(data) {
+          for (let i = reg; i < data.feeds.length; i++) {
+            const feeds = data.feeds[i];
+
+            if (feeds.created_at.includes(date) == true) {
+              if (cmax < feeds.field1) {
+                cmax = feeds.field1;
+                $('#hcmax').html(cmax + '°C');
+              }
+
+              if (cmin > feeds.field1) {
+                cmin = feeds.field1;
+                $('#hcmin').html(cmin + '°C');
+              }
+
+              chartsuhu.data.labels.push(feeds.created_at);
+              chartsuhu.data.datasets[0].data.push(feeds.field1);
+
+              chartsuhu.update();
+            }
+
+            reg++;
+          }
+          setTimeout(function() {
+            getsuhu();
+          }, 5000);
+        }
+      });
+    }
+  </script>
+</body>
+
+</html>
